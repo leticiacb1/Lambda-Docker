@@ -33,13 +33,27 @@ class LambdaFunction():
         print("\n    [INFO] Read Content that will be deployed. \n")
         print(self.content_to_deploy)
 
-    def create_function(self, function_handler: str, function_name: str) -> None:
+    def create_function_zip(self, function_handler: str, function_name: str) -> None:        
         lambda_response = self.lambda_client.create_function( FunctionName=function_name,
                                                               Runtime=self.runtime,
                                                               Role=self.config.ROLE_ARN,
                                                               Handler=function_handler, 
                                                               Code={"ZipFile": self.content_to_deploy},
                                                             )
+
+        print("\n    [INFO] Function ARN Response: \n")
+        print("\n           > " + lambda_response["FunctionArn"])
+
+    def create_function_image(self, function_name: str, image_uri: str) -> None:        
+        lambda_response = self.lambda_client.create_function( FunctionName=function_name,
+                                                              PackageType="Image",
+                                                              Code={"ImageUri": image_uri},
+                                                              Role=self.config.ROLE_ARN,
+                                                              Timeout=30,      # Optional: function timeout in seconds
+                                                              MemorySize=128,  # Optional: function memory size in megabytes
+                                                            )
+        print("\n    [INFO] Function Name: \n")
+        print("\n           > " + lambda_response['FunctionName'])
 
         print("\n    [INFO] Function ARN Response: \n")
         print("\n           > " + lambda_response["FunctionArn"])
@@ -131,15 +145,16 @@ class LambdaFunction():
         else:
             print(f"\n    [INFO] No Lambda function to delete. \n")
 
-    def _delete_layer(self, layer_name: str) -> None:
+    def _delete_layer(self, layer_name: str = None) -> None:
         if(self.lambda_client):
-            # Fetch the layer version ARN based on the layer name
-            response = self.lambda_client.list_layer_versions(
-                CompatibleRuntime= self.runtime,  # Provide the compatible runtime of the layer
-                LayerName=layer_name,             # Must be the same runtime as lambda function
-            )
+            if(layer_name != None):
+                # Fetch the layer version ARN based on the layer name
+                response = self.lambda_client.list_layer_versions(
+                    CompatibleRuntime= self.runtime,  # Provide the compatible runtime of the layer
+                    LayerName=layer_name,             # Must be the same runtime as lambda function
+                )
 
-            if "LayerVersions" in response:
+            if  layer_name != None and "LayerVersions" in response:
                 layer_versions = response["LayerVersions"]
 
                 # Delete each layer version
@@ -154,7 +169,7 @@ class LambdaFunction():
         else:
             print(f"\n    [INFO] No Layer to delete. \n")
 
-    def cleanup(self, function_name: str, layer_name: str) -> None:
+    def cleanup(self, function_name: str, layer_name: str = None) -> None:
 
         # Delete the Lambda function
         self._delete_function(function_name = function_name)
